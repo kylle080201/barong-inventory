@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth';
 import { NextRequest, NextResponse } from 'next/server';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth-options';
 import { verifyToken } from './jwt';
 
 export async function requireAuth(request: NextRequest) {

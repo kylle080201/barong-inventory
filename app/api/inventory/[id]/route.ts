@@ -51,7 +51,7 @@ export async function PUT(
     const body = await request.json();
     
     // Remove category and color from update body if they exist
-    const { category, color, ...cleanBody } = body;
+    const { category: _category, color: _color, ...cleanBody } = body;
     
     const item = await Inventory.findByIdAndUpdate(id, cleanBody, {
       new: true,
@@ -66,7 +66,7 @@ export async function PUT(
     }
     
     // Remove category and color if they exist
-    const { category, color, ...cleanItem } = item as any;
+    const { category: _category2, color: _color2, ...cleanItem } = item as any;
     
     return NextResponse.json({ success: true, data: cleanItem });
   } catch (error: any) {
