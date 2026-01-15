@@ -15,7 +15,15 @@ export async function GET(
     await connectDB();
     const { id } = await params;
     
-    const item = await Inventory.findById(id).lean();
+    const user = (request as any).user;
+    if (!user || !user.id) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized - User not found' },
+        { status: 401 }
+      );
+    }
+    
+    const item = await Inventory.findOne({ _id: id, userId: user.id }).lean();
     
     if (!item) {
       return NextResponse.json(
@@ -48,15 +56,30 @@ export async function PUT(
     await connectDB();
     const { id } = await params;
     
+    const user = (request as any).user;
+    if (!user || !user.id) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized - User not found' },
+        { status: 401 }
+      );
+    }
+    
     const body = await request.json();
     
     // Remove category and color from update body if they exist
     const { category: _category, color: _color, ...cleanBody } = body;
     
-    const item = await Inventory.findByIdAndUpdate(id, cleanBody, {
-      new: true,
-      runValidators: true,
-    }).lean();
+    // Ensure userId cannot be changed
+    delete cleanBody.userId;
+    
+    const item = await Inventory.findOneAndUpdate(
+      { _id: id, userId: user.id },
+      cleanBody,
+      {
+        new: true,
+        runValidators: true,
+      }
+    ).lean();
     
     if (!item) {
       return NextResponse.json(
@@ -99,7 +122,15 @@ export async function DELETE(
     await connectDB();
     const { id } = await params;
     
-    const item = await Inventory.findByIdAndDelete(id);
+    const user = (request as any).user;
+    if (!user || !user.id) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized - User not found' },
+        { status: 401 }
+      );
+    }
+    
+    const item = await Inventory.findOneAndDelete({ _id: id, userId: user.id });
     
     if (!item) {
       return NextResponse.json(

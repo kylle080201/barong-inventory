@@ -11,11 +11,22 @@ export async function GET(request: NextRequest) {
   try {
     await connectDB();
     
+    const user = (request as any).user;
+    if (!user || !user.id) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized - User not found' },
+        { status: 401 }
+      );
+    }
+    
     const searchParams = request.nextUrl.searchParams;
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
     
-    let query: any = {};
+    let query: any = { 
+      userId: user.id,
+      deletedAt: null, // Only get non-deleted sales
+    };
     
     if (startDate || endDate) {
       query.saleDate = {};

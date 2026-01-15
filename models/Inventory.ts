@@ -8,6 +8,7 @@ export interface IInventory extends Document {
   cost: number;
   quantity: number;
   imageUrl?: string;
+  userId: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -51,6 +52,12 @@ const InventorySchema: Schema = new Schema(
     imageUrl: {
       type: String,
       trim: true,
+    },
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+      index: true,
     },
   },
   {
