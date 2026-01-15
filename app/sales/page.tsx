@@ -8,6 +8,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { toast } from 'sonner';
+import { Trash2 } from 'lucide-react';
 
 interface SaleItem {
   inventoryId: string;
@@ -36,6 +46,8 @@ export default function SalesPage() {
   const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [saleToDelete, setSaleToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSales();
@@ -76,6 +88,35 @@ export default function SalesPage() {
       .split('_')
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
+  };
+
+  const handleDeleteClick = (saleId: string) => {
+    setSaleToDelete(saleId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!saleToDelete) return;
+
+    try {
+      const response = await fetch(`/api/sales/${saleToDelete}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Sale deleted successfully');
+        fetchSales(); // Refresh the list
+        setDeleteDialogOpen(false);
+        setSaleToDelete(null);
+      } else {
+        toast.error(data.error || 'Failed to delete sale');
+      }
+    } catch (error) {
+      console.error('Error deleting sale:', error);
+      toast.error('Failed to delete sale');
+    }
   };
 
   return (
@@ -142,13 +183,24 @@ export default function SalesPage() {
                         </h3>
                         <p className="text-sm text-muted-foreground">{formatDate(sale.saleDate)}</p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-2xl font-bold">
-                          ₱{sale.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {formatPaymentMethod(sale.paymentMethod)}
-                        </p>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="text-2xl font-bold">
+                            ₱{sale.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {formatPaymentMethod(sale.paymentMethod)}
+                          </p>
+                        </div>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeleteClick(sale._id)}
+                          className="flex items-center gap-2"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Delete
+                        </Button>
                       </div>
                     </div>
 
@@ -201,6 +253,31 @@ export default function SalesPage() {
             </div>
           )}
         </main>
+
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Sale</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete this sale? This action will restore the inventory quantities and cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setDeleteDialogOpen(false);
+                  setSaleToDelete(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleDeleteConfirm}>
+                Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AuthGuard>
   );

@@ -11,10 +11,18 @@ export async function GET(request: NextRequest) {
   try {
     await connectDB();
     
+    const user = (request as any).user;
+    if (!user || !user.id) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized - User not found' },
+        { status: 401 }
+      );
+    }
+    
     const searchParams = request.nextUrl.searchParams;
     const search = searchParams.get('search');
     
-    let query: any = {};
+    let query: any = { userId: user.id };
     
     if (search) {
       query.$or = [
@@ -50,6 +58,14 @@ export async function POST(request: NextRequest) {
   try {
     await connectDB();
     
+    const user = (request as any).user;
+    if (!user || !user.id) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized - User not found' },
+        { status: 401 }
+      );
+    }
+    
     const body = await request.json();
     
     // Remove category and color if they exist (shouldn't be sent, but just in case)
@@ -72,7 +88,10 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const item = await Inventory.create(cleanBody);
+    const item = await Inventory.create({
+      ...cleanBody,
+      userId: user.id,
+    });
     
     return NextResponse.json({ success: true, data: item }, { status: 201 });
   } catch (error: any) {

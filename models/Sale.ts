@@ -19,6 +19,8 @@ export interface ISale extends Document {
   customerName?: string;
   customerContact?: string;
   notes?: string;
+  userId: string;
+  deletedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -101,6 +103,16 @@ const SaleSchema: Schema = new Schema(
     notes: {
       type: String,
       trim: true,
+    },
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+      index: true,
+    },
+    deletedAt: {
+      type: Date,
+      index: true,
     },
   },
   {
