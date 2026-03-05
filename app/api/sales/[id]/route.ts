@@ -5,6 +5,156 @@ import Inventory from '@/models/Inventory';
 import { requireAuth } from '@/lib/auth-middleware';
 import mongoose from 'mongoose';
 
+// PUT - Update a sale
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const authError = await requireAuth(request);
+  if (authError) return authError;
+
+  try {
+    await connectDB();
+    const { id } = await params;
+    
+    const user = (request as any).user;
+    if (!user || !user.id) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized - User not found' },
+        { status: 401 }
+      );
+    }
+    
+    // Find the sale and verify it belongs to the user and is not deleted
+    const sale = await Sale.findOne({ 
+      _id: id,
+      userId: user.id,
+      deletedAt: null,
+    });
+    
+    if (!sale) {
+      return NextResponse.json(
+        { success: false, error: 'Sale not found or you do not have permission to edit it' },
+        { status: 404 }
+      );
+    }
+    
+    const body = await request.json();
+    const { saleDate, items, discount = 0, paymentMethod, customerName, customerContact, notes } = body;
+    
+    // Validate date is not in the future
+    const saleDateObj = saleDate ? new Date(saleDate) : sale.saleDate;
+    const today = new Date();
+    today.setHours(23, 59, 59, 999); // End of today
+    if (saleDateObj > today) {
+      return NextResponse.json(
+        { success: false, error: 'Sale date cannot be in the future' },
+        { status: 400 }
+      );
+    }
+    
+    // Calculate new subtotal and total
+    const subtotal = items.reduce((sum: number, item: any) => sum + item.total, 0);
+    const total = subtotal - (discount || 0);
+    
+    // Restore original inventory quantities first
+    for (const oldItem of sale.items) {
+      const inventoryItem = await Inventory.findOne({
+        _id: oldItem.inventoryId,
+        userId: user.id,
+      });
+      
+      if (inventoryItem) {
+        inventoryItem.quantity += oldItem.quantity;
+        await inventoryItem.save();
+      }
+    }
+    
+    // Validate and update inventory quantities with new quantities
+    for (const item of items) {
+      // Ensure size is included
+      if (!item.size) {
+        const inventoryItem = await Inventory.findOne({ 
+          _id: item.inventoryId, 
+          userId: user.id 
+        }).lean();
+        if (inventoryItem) {
+          item.size = inventoryItem.size || '';
+        }
+      }
+      
+      const inventoryItem = await Inventory.findOne({ 
+        _id: item.inventoryId, 
+        userId: user.id 
+      });
+      
+      if (!inventoryItem) {
+        // Restore all items if validation fails
+        for (const oldItem of sale.items) {
+          const invItem = await Inventory.findOne({
+            _id: oldItem.inventoryId,
+            userId: user.id,
+          });
+          if (invItem) {
+            invItem.quantity -= oldItem.quantity;
+            await invItem.save();
+          }
+        }
+        return NextResponse.json(
+          { success: false, error: `Inventory item ${item.name} not found or not accessible` },
+          { status: 404 }
+        );
+      }
+      
+      if (inventoryItem.quantity < item.quantity) {
+        // Restore all items if validation fails
+        for (const oldItem of sale.items) {
+          const invItem = await Inventory.findOne({
+            _id: oldItem.inventoryId,
+            userId: user.id,
+          });
+          if (invItem) {
+            invItem.quantity -= oldItem.quantity;
+            await invItem.save();
+          }
+        }
+        return NextResponse.json(
+          { success: false, error: `Insufficient stock for ${item.name}` },
+          { status: 400 }
+        );
+      }
+      
+      inventoryItem.quantity -= item.quantity;
+      await inventoryItem.save();
+    }
+    
+    // Update the sale
+    sale.saleDate = saleDateObj;
+    sale.items = items;
+    sale.subtotal = subtotal;
+    sale.discount = discount;
+    sale.total = total;
+    sale.paymentMethod = paymentMethod;
+    sale.customerName = customerName || undefined;
+    sale.customerContact = customerContact || undefined;
+    sale.notes = notes || undefined;
+    
+    await sale.save();
+    
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Sale updated successfully',
+      data: sale 
+    });
+  } catch (error: any) {
+    console.error('PUT /api/sales/[id] error:', error);
+    return NextResponse.json(
+      { success: false, error: error.message || 'Failed to update sale' },
+      { status: 500 }
+    );
+  }
+}
+
 // DELETE - Soft delete a sale (set deletedAt)
 export async function DELETE(
   request: NextRequest,
