@@ -17,7 +17,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Edit } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Select } from '@/components/ui/select';
 
 interface SaleItem {
   inventoryId: string;
@@ -48,6 +50,18 @@ export default function SalesPage() {
   const [endDate, setEndDate] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [saleToDelete, setSaleToDelete] = useState<string | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [saleToEdit, setSaleToEdit] = useState<Sale | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    saleDate: '',
+    items: [] as SaleItem[],
+    discount: '0',
+    paymentMethod: 'cash',
+    customerName: '',
+    customerContact: '',
+    notes: '',
+  });
+  const [editLoading, setEditLoading] = useState(false);
 
   useEffect(() => {
     fetchSales();
@@ -117,6 +131,114 @@ export default function SalesPage() {
       console.error('Error deleting sale:', error);
       toast.error('Failed to delete sale');
     }
+  };
+
+  const handleEditClick = (sale: Sale) => {
+    // Format current date for input (YYYY-MM-DDTHH:mm) - default to current date
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const dateTimeString = `${year}-${month}-${day}T${hours}:${minutes}`;
+    
+    setSaleToEdit(sale);
+    setEditFormData({
+      saleDate: dateTimeString,
+      items: sale.items.map(item => ({ ...item })),
+      discount: String(sale.discount || 0),
+      paymentMethod: sale.paymentMethod,
+      customerName: sale.customerName || '',
+      customerContact: sale.customerContact || '',
+      notes: sale.notes || '',
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleEditItemQuantity = (index: number, quantity: number) => {
+    if (quantity <= 0) {
+      const newItems = editFormData.items.filter((_, i) => i !== index);
+      setEditFormData({ ...editFormData, items: newItems });
+    } else {
+      const newItems = [...editFormData.items];
+      newItems[index] = {
+        ...newItems[index],
+        quantity,
+        total: quantity * newItems[index].price,
+      };
+      setEditFormData({ ...editFormData, items: newItems });
+    }
+  };
+
+  const handleEditRemoveItem = (index: number) => {
+    const newItems = editFormData.items.filter((_, i) => i !== index);
+    setEditFormData({ ...editFormData, items: newItems });
+  };
+
+  const handleEditSubmit = async () => {
+    if (!saleToEdit) return;
+
+    if (editFormData.items.length === 0) {
+      toast.error('Sale must have at least one item');
+      return;
+    }
+
+    const subtotal = editFormData.items.reduce((sum, item) => sum + item.total, 0);
+    const discount = parseFloat(editFormData.discount) || 0;
+    const total = subtotal - discount;
+
+    if (total < 0) {
+      toast.error('Total cannot be negative. Please adjust the discount.');
+      return;
+    }
+
+    setEditLoading(true);
+
+    try {
+      const response = await fetch(`/api/sales/${saleToEdit._id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          saleDate: editFormData.saleDate,
+          items: editFormData.items,
+          discount,
+          paymentMethod: editFormData.paymentMethod,
+          customerName: editFormData.customerName || undefined,
+          customerContact: editFormData.customerContact || undefined,
+          notes: editFormData.notes || undefined,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Sale updated successfully');
+        fetchSales(); // Refresh the list
+        setEditDialogOpen(false);
+        setSaleToEdit(null);
+      } else {
+        toast.error(data.error || 'Failed to update sale');
+      }
+    } catch (error) {
+      console.error('Error updating sale:', error);
+      toast.error('Failed to update sale');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  // Get max date for date input (today)
+  const getMaxDateTime = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
 
   return (
@@ -192,15 +314,26 @@ export default function SalesPage() {
                             {formatPaymentMethod(sale.paymentMethod)}
                           </p>
                         </div>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDeleteClick(sale._id)}
-                          className="flex items-center gap-2"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          Delete
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditClick(sale)}
+                            className="flex items-center gap-2"
+                          >
+                            <Edit className="h-4 w-4" />
+                            Edit
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleDeleteClick(sale._id)}
+                            className="flex items-center gap-2"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Delete
+                          </Button>
+                        </div>
                       </div>
                     </div>
 
@@ -274,6 +407,193 @@ export default function SalesPage() {
               </Button>
               <Button variant="destructive" onClick={handleDeleteConfirm}>
                 Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Sale</DialogTitle>
+              <DialogDescription>
+                Update the sale information. Date cannot be set to a future date.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              <div>
+                <Label htmlFor="editSaleDate">Sale Date & Time *</Label>
+                <Input
+                  id="editSaleDate"
+                  type="datetime-local"
+                  value={editFormData.saleDate}
+                  max={getMaxDateTime()}
+                  onChange={(e) => setEditFormData({ ...editFormData, saleDate: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label>Items</Label>
+                <div className="space-y-2 mt-2">
+                  {editFormData.items.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No items</p>
+                  ) : (
+                    editFormData.items.map((item, index) => (
+                      <div key={index} className="border rounded-md p-3">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex-1">
+                            <p className="font-medium text-sm">{item.name} ({item.size})</p>
+                            <p className="text-xs text-muted-foreground">
+                              ₱{item.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} each
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditRemoveItem(index)}
+                          >
+                            ×
+                          </Button>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditItemQuantity(index, item.quantity - 1)}
+                          >
+                            −
+                          </Button>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) =>
+                              handleEditItemQuantity(index, parseInt(e.target.value) || 1)
+                            }
+                            className="w-16 text-center"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditItemQuantity(index, item.quantity + 1)}
+                          >
+                            +
+                          </Button>
+                          <span className="ml-auto font-medium">
+                            ₱{item.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="editDiscount">Discount (₱)</Label>
+                <Input
+                  id="editDiscount"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={editFormData.discount}
+                  onChange={(e) => setEditFormData({ ...editFormData, discount: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="editPaymentMethod">Payment Method *</Label>
+                <Select
+                  id="editPaymentMethod"
+                  required
+                  value={editFormData.paymentMethod}
+                  onChange={(e) => setEditFormData({ ...editFormData, paymentMethod: e.target.value })}
+                >
+                  <option value="cash">Cash</option>
+                  <option value="card">Card</option>
+                  <option value="gcash">GCash</option>
+                  <option value="paymaya">PayMaya</option>
+                  <option value="bank_transfer">Bank Transfer</option>
+                  <option value="other">Other</option>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="editCustomerName">Customer Name</Label>
+                <Input
+                  id="editCustomerName"
+                  type="text"
+                  value={editFormData.customerName}
+                  onChange={(e) => setEditFormData({ ...editFormData, customerName: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="editCustomerContact">Customer Contact</Label>
+                <Input
+                  id="editCustomerContact"
+                  type="text"
+                  value={editFormData.customerContact}
+                  onChange={(e) => setEditFormData({ ...editFormData, customerContact: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="editNotes">Notes</Label>
+                <Textarea
+                  id="editNotes"
+                  value={editFormData.notes}
+                  onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
+                  rows={3}
+                />
+              </div>
+
+              <div className="border-t pt-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Subtotal:</span>
+                  <span>
+                    ₱{editFormData.items.reduce((sum, item) => sum + item.total, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Discount:</span>
+                  <span>
+                    {parseFloat(editFormData.discount) > 0 ? (
+                      <span className="text-green-600">
+                        -₱{parseFloat(editFormData.discount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">₱0.00</span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between font-semibold pt-2 border-t">
+                  <span>Total:</span>
+                  <span>
+                    ₱{(editFormData.items.reduce((sum, item) => sum + item.total, 0) - (parseFloat(editFormData.discount) || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setEditDialogOpen(false);
+                  setSaleToEdit(null);
+                }}
+                disabled={editLoading}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleEditSubmit} disabled={editLoading || editFormData.items.length === 0}>
+                {editLoading ? 'Saving...' : 'Save Changes'}
               </Button>
             </DialogFooter>
           </DialogContent>
