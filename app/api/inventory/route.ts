@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Validate size is in the enum
-    const validSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+    const validSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'Yards'];
     if (!validSizes.includes(cleanBody.size)) {
       return NextResponse.json(
         { success: false, error: `Size must be one of: ${validSizes.join(', ')}` },

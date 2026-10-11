@@ -113,6 +113,7 @@ export default function NewInventoryPage() {
                     <option value="XL">XL</option>
                     <option value="XXL">XXL</option>
                     <option value="XXXL">XXXL</option>
+                    <option value="Yards">Yards</option>
                   </Select>
                 </div>
 

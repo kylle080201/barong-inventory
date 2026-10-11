@@ -106,6 +106,9 @@ export default function Home() {
                 <Link href="/inventory/new">
                   <Button className="w-full">Add New Item</Button>
                 </Link>
+                <Link href="/inventory/restock">
+                  <Button className="w-full" variant="outline">Restock Item</Button>
+                </Link>
                 <Link href="/sales/new">
                   <Button className="w-full" variant="outline">Record New Sale</Button>
                 </Link>
