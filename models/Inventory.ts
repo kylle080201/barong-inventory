@@ -29,8 +29,8 @@ const InventorySchema: Schema = new Schema(
       required: [true, 'Size is required'],
       trim: true,
       enum: {
-        values: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'],
-        message: 'Size must be one of: XS, S, M, L, XL, XXL, XXXL',
+        values: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'Yards'],
+        message: 'Size must be one of: XS, S, M, L, XL, XXL, XXXL, Yards',
       },
     },
     price: {
