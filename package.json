@@ -7,9 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "create-admin": "tsx scripts/create-admin.ts"
+    "create-admin": "tsx scripts/create-admin.ts",
+    "mcp-token": "tsx scripts/mcp-token.ts"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@radix-ui/react-dialog": "^1.1.15",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
@@ -25,7 +27,8 @@
     "react-dom": "^18.2.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

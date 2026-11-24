@@ -3,6 +3,8 @@ import connectDB from '@/lib/mongodb';
 import Sale from '@/models/Sale';
 import Inventory from '@/models/Inventory';
 import { requireAuth } from '@/lib/auth-middleware';
+import { recordSale } from '@/lib/services/sales';
+import { errorResponse, unauthorized } from '@/lib/services/http';
 
 // GET - Fetch all sales with optional date filtering
 export async function GET(request: NextRequest) {
@@ -77,92 +79,14 @@ export async function POST(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    await connectDB();
-    
     const user = (request as any).user;
-    if (!user || !user.id) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized - User not found' },
-        { status: 401 }
-      );
-    }
-    
+    if (!user || !user.id) return unauthorized();
+
     const body = await request.json();
-    const { saleDate, items, discount = 0, paymentMethod, customerName, customerContact, notes } = body;
+    const sale = await recordSale(user.id, body);
 
-    // Sale date: when the sale happened (defaults to now). createdAt records when it was entered.
-    const saleDateObj = saleDate ? new Date(saleDate) : new Date();
-    if (isNaN(saleDateObj.getTime())) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid sale date' },
-        { status: 400 }
-      );
-    }
-    const endOfToday = new Date();
-    endOfToday.setHours(23, 59, 59, 999);
-    if (saleDateObj > endOfToday) {
-      return NextResponse.json(
-        { success: false, error: 'Sale date cannot be in the future' },
-        { status: 400 }
-      );
-    }
-
-    // Calculate subtotal and total
-    const subtotal = items.reduce((sum: number, item: any) => sum + item.total, 0);
-    const total = subtotal - (discount || 0);
-    
-    // Validate and update inventory quantities (only user's inventory)
-    for (const item of items) {
-      // Ensure size is included
-      if (!item.size) {
-        const inventoryItem = await Inventory.findOne({ 
-          _id: item.inventoryId, 
-          userId: user.id 
-        }).lean();
-        if (inventoryItem) {
-          item.size = inventoryItem.size || '';
-        }
-      }
-      
-      const inventoryItem = await Inventory.findOne({ 
-        _id: item.inventoryId, 
-        userId: user.id 
-      });
-      if (!inventoryItem) {
-        return NextResponse.json(
-          { success: false, error: `Inventory item ${item.name} not found or not accessible` },
-          { status: 404 }
-        );
-      }
-      if (inventoryItem.quantity < item.quantity) {
-        return NextResponse.json(
-          { success: false, error: `Insufficient stock for ${item.name}` },
-          { status: 400 }
-        );
-      }
-      inventoryItem.quantity -= item.quantity;
-      await inventoryItem.save();
-    }
-    
-    const sale = await Sale.create({
-      saleDate: saleDateObj,
-      items,
-      subtotal,
-      discount,
-      total,
-      paymentMethod,
-      customerName,
-      customerContact,
-      notes,
-      userId: user.id,
-    });
-    
     return NextResponse.json({ success: true, data: sale }, { status: 201 });
   } catch (error: any) {
-    return NextResponse.json(
-      { success: false, error: error.message },
-      { status: 400 }
-    );
+    return errorResponse(error, 'POST /api/sales', 'Failed to record sale');
   }
 }
-

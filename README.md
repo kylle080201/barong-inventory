@@ -103,6 +103,41 @@ barong-inventory/
 - `POST /api/sales` - Create new sale
 - `GET /api/sales/summary` - Get sales summary (supports `?startDate=` and `?endDate=`)
 
+## MCP Server
+
+The app exposes an [MCP](https://modelcontextprotocol.io) endpoint at `/api/mcp` so AI assistants (Claude Desktop, Claude Code, etc.) can record and update sales and stock for you. It uses the same logic as the web app, so stock is adjusted the same way.
+
+| Tool | What it does |
+| --- | --- |
+| `list_inventory` | List products with ids, size, price, cost and stock (optional search) |
+| `add_inventory_item` | Add a product with its starting stock |
+| `update_inventory_item` | Change a product's details (only the fields given) |
+| `restock_item` | Add arriving stock to a product |
+| `list_sales` | List recent sales with ids, items and totals |
+| `record_sale` | Record a sale (with optional sale date); deducts stock |
+| `update_sale` | Edit a sale; stock is adjusted by the difference |
+
+### Connecting a client
+
+1. Create a token for your account (signed with `NEXTAUTH_SECRET` from `.env.local`, which must match the deployed app's):
+
+   ```bash
+   npm run mcp-token you@example.com        # valid 90 days
+   npm run mcp-token you@example.com 365d   # custom expiry
+   ```
+
+   Anyone with the token can change sales and stock as you, so keep it private. Changing `NEXTAUTH_SECRET` invalidates all tokens.
+
+2. Add the server to your client. For Claude Code:
+
+   ```bash
+   claude mcp add --transport http barong-inventory https://your-app-url/api/mcp --header "Authorization: Bearer <token>"
+   ```
+
+   Other clients: use the Streamable HTTP URL `https://your-app-url/api/mcp` (or `http://localhost:3000/api/mcp` locally) with the header `Authorization: Bearer <token>`.
+
+Sale dates given as `YYYY-MM-DD` are read as that day in Philippine time (UTC+8); set `BUSINESS_UTC_OFFSET` (e.g. `+08:00`) to change this.
+
 ## Technologies Used
 
 - **Next.js 14** - React framework with App Router
