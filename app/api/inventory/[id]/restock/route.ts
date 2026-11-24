@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import mongoose from 'mongoose';
-import connectDB from '@/lib/mongodb';
-import Inventory from '@/models/Inventory';
 import { requireAuth } from '@/lib/auth-middleware';
+import { restockInventoryItem } from '@/lib/services/inventory';
+import { errorResponse, unauthorized } from '@/lib/services/http';
 
 export async function POST(
   request: NextRequest,
@@ -12,55 +11,16 @@ export async function POST(
   if (authError) return authError;
 
   try {
-    await connectDB();
     const { id } = await params;
 
     const user = (request as any).user;
-    if (!user || !user.id) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized - User not found' },
-        { status: 401 }
-      );
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid product' },
-        { status: 400 }
-      );
-    }
+    if (!user || !user.id) return unauthorized();
 
     const body = await request.json();
-    const amount = Number(body.amount);
+    const item = await restockInventoryItem(user.id, id, Number(body.amount));
 
-    if (!Number.isInteger(amount) || amount < 1) {
-      return NextResponse.json(
-        { success: false, error: 'Amount must be a whole number greater than 0' },
-        { status: 400 }
-      );
-    }
-
-    const item = await Inventory.findOneAndUpdate(
-      { _id: id, userId: user.id },
-      { $inc: { quantity: amount } },
-      { new: true }
-    ).lean();
-
-    if (!item) {
-      return NextResponse.json(
-        { success: false, error: 'Product not found' },
-        { status: 404 }
-      );
-    }
-
-    const { category: _category, color: _color, ...cleanItem } = item as any;
-
-    return NextResponse.json({ success: true, data: cleanItem });
+    return NextResponse.json({ success: true, data: item });
   } catch (error: any) {
-    console.error('POST /api/inventory/[id]/restock error:', error);
-    return NextResponse.json(
-      { success: false, error: error.message || 'Failed to restock product' },
-      { status: 500 }
-    );
+    return errorResponse(error, 'POST /api/inventory/[id]/restock', 'Failed to restock product');
   }
 }

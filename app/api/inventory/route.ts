@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import Inventory from '@/models/Inventory';
 import { requireAuth } from '@/lib/auth-middleware';
+import { createInventoryItem } from '@/lib/services/inventory';
+import { errorResponse } from '@/lib/services/http';
 
 // GET - Fetch all inventory items
 export async function GET(request: NextRequest) {
@@ -67,49 +69,11 @@ export async function POST(request: NextRequest) {
     }
     
     const body = await request.json();
-    
-    // Remove category and color if they exist (shouldn't be sent, but just in case)
-    const { category, color, ...cleanBody } = body;
-    
-    // Validate required fields
-    if (!cleanBody.name || !cleanBody.size || cleanBody.price === undefined || cleanBody.cost === undefined || cleanBody.quantity === undefined) {
-      return NextResponse.json(
-        { success: false, error: 'Missing required fields: name, size, price, cost, quantity' },
-        { status: 400 }
-      );
-    }
-    
-    // Validate size is in the enum
-    const validSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'Yards'];
-    if (!validSizes.includes(cleanBody.size)) {
-      return NextResponse.json(
-        { success: false, error: `Size must be one of: ${validSizes.join(', ')}` },
-        { status: 400 }
-      );
-    }
-    
-    const item = await Inventory.create({
-      ...cleanBody,
-      userId: user.id,
-    });
-    
+    const item = await createInventoryItem(user.id, body);
+
     return NextResponse.json({ success: true, data: item }, { status: 201 });
   } catch (error: any) {
-    console.error('POST /api/inventory error:', error);
-    
-    // Handle validation errors
-    if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map((err: any) => err.message).join(', ');
-      return NextResponse.json(
-        { success: false, error: messages },
-        { status: 400 }
-      );
-    }
-    
-    return NextResponse.json(
-      { success: false, error: error.message || 'Failed to create inventory item' },
-      { status: 400 }
-    );
+    return errorResponse(error, 'POST /api/inventory', 'Failed to create inventory item');
   }
 }
 

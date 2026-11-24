@@ -208,7 +208,8 @@ export default function SalesPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          saleDate: editFormData.saleDate,
+          // datetime-local has no time zone; send an exact timestamp
+          saleDate: new Date(editFormData.saleDate).toISOString(),
           items: editFormData.items,
           discount,
           paymentMethod: editFormData.paymentMethod,

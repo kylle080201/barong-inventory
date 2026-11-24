@@ -9,10 +9,11 @@ export interface TokenPayload {
   role: string;
 }
 
-export function generateToken(payload: TokenPayload): string {
-  return jwt.sign(payload, JWT_SECRET, {
-    expiresIn: '7d', // Token expires in 7 days
-  });
+export function generateToken(
+  payload: TokenPayload,
+  expiresIn: jwt.SignOptions['expiresIn'] = '7d' // Default: 7 days
+): string {
+  return jwt.sign(payload, JWT_SECRET, { expiresIn });
 }
 
 export function verifyToken(token: string): TokenPayload | null {

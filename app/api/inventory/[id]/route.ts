@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import Inventory from '@/models/Inventory';
 import { requireAuth } from '@/lib/auth-middleware';
+import { updateInventoryItem } from '@/lib/services/inventory';
+import { errorResponse } from '@/lib/services/http';
 
 // GET - Fetch single inventory item
 export async function GET(
@@ -65,48 +67,11 @@ export async function PUT(
     }
     
     const body = await request.json();
-    
-    // Remove category and color from update body if they exist
-    const { category: _category, color: _color, ...cleanBody } = body;
-    
-    // Ensure userId cannot be changed
-    delete cleanBody.userId;
-    
-    const item = await Inventory.findOneAndUpdate(
-      { _id: id, userId: user.id },
-      cleanBody,
-      {
-        new: true,
-        runValidators: true,
-      }
-    ).lean();
-    
-    if (!item) {
-      return NextResponse.json(
-        { success: false, error: 'Item not found' },
-        { status: 404 }
-      );
-    }
-    
-    // Remove category and color if they exist
-    const { category: _category2, color: _color2, ...cleanItem } = item as any;
-    
-    return NextResponse.json({ success: true, data: cleanItem });
+    const item = await updateInventoryItem(user.id, id, body);
+
+    return NextResponse.json({ success: true, data: item });
   } catch (error: any) {
-    console.error('PUT /api/inventory/[id] error:', error);
-    
-    if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map((err: any) => err.message).join(', ');
-      return NextResponse.json(
-        { success: false, error: messages },
-        { status: 400 }
-      );
-    }
-    
-    return NextResponse.json(
-      { success: false, error: error.message },
-      { status: 400 }
-    );
+    return errorResponse(error, 'PUT /api/inventory/[id]', 'Failed to update inventory item');
   }
 }
 
