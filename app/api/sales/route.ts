@@ -88,8 +88,25 @@ export async function POST(request: NextRequest) {
     }
     
     const body = await request.json();
-    const { items, discount = 0, paymentMethod, customerName, customerContact, notes } = body;
-    
+    const { saleDate, items, discount = 0, paymentMethod, customerName, customerContact, notes } = body;
+
+    // Sale date: when the sale happened (defaults to now). createdAt records when it was entered.
+    const saleDateObj = saleDate ? new Date(saleDate) : new Date();
+    if (isNaN(saleDateObj.getTime())) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid sale date' },
+        { status: 400 }
+      );
+    }
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+    if (saleDateObj > endOfToday) {
+      return NextResponse.json(
+        { success: false, error: 'Sale date cannot be in the future' },
+        { status: 400 }
+      );
+    }
+
     // Calculate subtotal and total
     const subtotal = items.reduce((sum: number, item: any) => sum + item.total, 0);
     const total = subtotal - (discount || 0);
@@ -128,7 +145,7 @@ export async function POST(request: NextRequest) {
     }
     
     const sale = await Sale.create({
-      saleDate: new Date(),
+      saleDate: saleDateObj,
       items,
       subtotal,
       discount,

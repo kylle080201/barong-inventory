@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Pagination, usePagination } from '@/components/ui/pagination';
 
 interface InventoryItem {
   _id: string;
@@ -21,7 +22,7 @@ interface InventoryItem {
   imageUrl?: string;
 }
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 10;
 
 function formatPrice(price: number) {
   return `₱${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -31,11 +32,7 @@ export default function InventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-
-  useEffect(() => {
-    setPage(1);
-  }, [search]);
+  const pagination = usePagination(items, PAGE_SIZE, [search]);
 
   useEffect(() => {
     fetchItems();
@@ -79,10 +76,7 @@ export default function InventoryPage() {
     }
   };
 
-  const pageCount = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
-  const safePage = Math.min(page, pageCount);
-  const pageStart = (safePage - 1) * PAGE_SIZE;
-  const pagedItems = items.slice(pageStart, pageStart + PAGE_SIZE);
+  const pagedItems = pagination.pageItems;
 
   return (
     <AuthGuard>
@@ -184,32 +178,6 @@ export default function InventoryPage() {
                     </CardContent>
                   </Card>
                 ))}
-
-                {pageCount > 1 && (
-                  <div className="space-y-3 pt-1">
-                    <p className="text-center text-sm text-muted-foreground">
-                      {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, items.length)} of {items.length}
-                    </p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={safePage === 1}
-                        onClick={() => setPage(safePage - 1)}
-                      >
-                        Previous
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={safePage === pageCount}
-                        onClick={() => setPage(safePage + 1)}
-                      >
-                        Next
-                      </Button>
-                    </div>
-                  </div>
-                )}
               </div>
 
               <Card className="hidden md:block">
@@ -225,7 +193,7 @@ export default function InventoryPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {items.map((item) => (
+                      {pagedItems.map((item) => (
                         <TableRow key={item._id} className={item.quantity < 10 ? 'bg-muted/50' : ''}>
                           <TableCell>
                             <div className="font-medium">{item.name}</div>
@@ -270,6 +238,15 @@ export default function InventoryPage() {
                   </Table>
                 </div>
               </Card>
+
+              <Pagination
+                page={pagination.page}
+                pageCount={pagination.pageCount}
+                start={pagination.start}
+                end={pagination.end}
+                total={pagination.total}
+                onPageChange={pagination.setPage}
+              />
             </>
           )}
         </main>

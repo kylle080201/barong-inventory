@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
+import { saleDateToISO, toDateInputValue } from '@/lib/sale-date';
 
 interface InventoryItem {
   _id: string;
@@ -35,6 +36,7 @@ export default function NewSalePage() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [saleItems, setSaleItems] = useState<SaleItem[]>([]);
   const [formData, setFormData] = useState({
+    saleDate: toDateInputValue(),
     discount: '0',
     paymentMethod: 'cash',
     customerName: '',
@@ -135,6 +137,16 @@ export default function NewSalePage() {
       return;
     }
 
+    if (!formData.saleDate) {
+      alert('Please pick a sale date.');
+      return;
+    }
+
+    if (formData.saleDate > toDateInputValue()) {
+      alert('Sale date cannot be in the future.');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -144,6 +156,7 @@ export default function NewSalePage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          saleDate: saleDateToISO(formData.saleDate),
           items: saleItems,
           discount,
           paymentMethod: formData.paymentMethod,
@@ -280,6 +293,21 @@ export default function NewSalePage() {
                     )}
 
                     <div className="border-t pt-4 space-y-4">
+                      <div>
+                        <Label htmlFor="saleDate">Sale Date *</Label>
+                        <Input
+                          id="saleDate"
+                          type="date"
+                          required
+                          max={toDateInputValue()}
+                          value={formData.saleDate}
+                          onChange={(e) => setFormData({ ...formData, saleDate: e.target.value })}
+                        />
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          When the sale happened. Today&apos;s date and time are saved as the recorded date.
+                        </p>
+                      </div>
+
                       <div>
                         <Label htmlFor="discount">Discount (₱)</Label>
                         <Input

@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { dayEndISO, dayStartISO } from '@/lib/sale-date';
 
 interface SummaryData {
   totalSales: number;
@@ -33,8 +34,8 @@ export default function SalesSummaryPage() {
     try {
       setLoading(true);
       const params = new URLSearchParams();
-      if (startDate) params.append('startDate', startDate);
-      if (endDate) params.append('endDate', endDate);
+      if (startDate) params.append('startDate', dayStartISO(startDate));
+      if (endDate) params.append('endDate', dayEndISO(endDate));
 
       const response = await fetch(`/api/sales/summary?${params.toString()}`);
       const data = await response.json();
