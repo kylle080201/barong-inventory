@@ -8,6 +8,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
+/** Where to go after login: ?callbackUrl= if it's a path on this site, otherwise the dashboard. */
+function getRedirectTarget() {
+  if (typeof window === 'undefined') return '/';
+  const target = new URLSearchParams(window.location.search).get('callbackUrl') || '/';
+  return target.startsWith('/') && !target.startsWith('//') && !target.startsWith('/\\') ? target : '/';
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -16,6 +23,17 @@ export default function LoginPage() {
     email: '',
     password: '',
   });
+
+  const goAfterLogin = () => {
+    const target = getRedirectTarget();
+    if (target === '/') {
+      router.push('/');
+      router.refresh();
+    } else {
+      // Full page load so server-rendered pages (like the OAuth approval page) see the new session
+      window.location.assign(target);
+    }
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -55,8 +73,7 @@ export default function LoginPage() {
           });
 
           if (retryResult?.ok) {
-            router.push('/');
-            router.refresh();
+            goAfterLogin();
           } else {
             setError('Session creation failed. Please refresh the page and try again.');
           }
@@ -64,8 +81,7 @@ export default function LoginPage() {
           setError(loginData.error || 'Invalid email or password');
         }
       } else if (result?.ok) {
-        router.push('/');
-        router.refresh();
+        goAfterLogin();
       } else {
         setError('An error occurred. Please try again.');
       }

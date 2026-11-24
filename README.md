@@ -117,7 +117,21 @@ The app exposes an [MCP](https://modelcontextprotocol.io) endpoint at `/api/mcp`
 | `record_sale` | Record a sale (with optional sale date); deducts stock |
 | `update_sale` | Edit a sale; stock is adjusted by the difference |
 
-### Connecting a client
+### Connecting ChatGPT, claude.ai and other OAuth clients
+
+The endpoint supports OAuth 2.1 sign-in (the MCP authorization spec), so web apps can connect without a token:
+
+1. Deploy the app at a public **https** URL and set `NEXTAUTH_URL` (or `OAUTH_ISSUER`) to that exact URL, e.g. `https://inventory.example.com`.
+2. In the client, add a custom connector / MCP server with the URL `https://inventory.example.com/api/mcp`. Leave any client ID/secret fields empty; the client registers itself.
+3. You're sent to the app to log in and approve access. Only approve connections you started yourself.
+
+How it works:
+- **Discovery:** `/.well-known/oauth-protected-resource` and `/.well-known/oauth-authorization-server`.
+- **Registration:** dynamic client registration at `/api/oauth/register`.
+- **Sign-in:** authorization code with PKCE (S256) through the approval page at `/oauth/authorize`.
+- **Tokens:** issued at `/api/oauth/token`. Access tokens last 1 hour and only work on `/api/mcp`. Refresh tokens last 30 days and are replaced each time they're used. They can be revoked at `/api/oauth/revoke`.
+
+### Connecting with a token (Claude Code, Claude Desktop, Gemini CLI)
 
 1. Create a token for your account (signed with `NEXTAUTH_SECRET` from `.env.local`, which must match the deployed app's):
 
