@@ -20,6 +20,10 @@ import { toast } from 'sonner';
 import { Trash2, Edit } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
+import { Pagination, usePagination } from '@/components/ui/pagination';
+import { dayEndISO, dayStartISO, toDateTimeInputValue } from '@/lib/sale-date';
+
+const PAGE_SIZE = 10;
 
 interface SaleItem {
   inventoryId: string;
@@ -33,6 +37,7 @@ interface SaleItem {
 interface Sale {
   _id: string;
   saleDate: string;
+  createdAt: string;
   items: SaleItem[];
   subtotal: number;
   discount?: number;
@@ -62,6 +67,7 @@ export default function SalesPage() {
     notes: '',
   });
   const [editLoading, setEditLoading] = useState(false);
+  const pagination = usePagination(sales, PAGE_SIZE, [startDate, endDate]);
 
   useEffect(() => {
     fetchSales();
@@ -71,8 +77,8 @@ export default function SalesPage() {
     try {
       setLoading(true);
       const params = new URLSearchParams();
-      if (startDate) params.append('startDate', startDate);
-      if (endDate) params.append('endDate', endDate);
+      if (startDate) params.append('startDate', dayStartISO(startDate));
+      if (endDate) params.append('endDate', dayEndISO(endDate));
 
       const response = await fetch(`/api/sales?${params.toString()}`);
       const data = await response.json();
@@ -88,6 +94,14 @@ export default function SalesPage() {
   };
 
   const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  const formatDateTime = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -134,18 +148,10 @@ export default function SalesPage() {
   };
 
   const handleEditClick = (sale: Sale) => {
-    // Format current date for input (YYYY-MM-DDTHH:mm) - default to current date
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const dateTimeString = `${year}-${month}-${day}T${hours}:${minutes}`;
-    
     setSaleToEdit(sale);
     setEditFormData({
-      saleDate: dateTimeString,
+      // Pre-fill with the sale's own date so saving other changes doesn't move it
+      saleDate: toDateTimeInputValue(new Date(sale.saleDate)),
       items: sale.items.map(item => ({ ...item })),
       discount: String(sale.discount || 0),
       paymentMethod: sale.paymentMethod,
@@ -295,17 +301,23 @@ export default function SalesPage() {
             </Card>
           ) : (
             <div className="space-y-4">
-              {sales.map((sale) => (
+              {pagination.pageItems.map((sale) => (
                 <Card key={sale._id}>
                   <CardContent className="pt-6">
-                    <div className="flex justify-between items-start mb-4">
+                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <h3 className="text-lg font-semibold">
                           Sale #{sale._id.slice(-6).toUpperCase()}
                         </h3>
-                        <p className="text-sm text-muted-foreground">{formatDate(sale.saleDate)}</p>
+                        <p className="text-sm">
+                          <span className="text-muted-foreground">Sale date:</span>{' '}
+                          {formatDate(sale.saleDate)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Recorded: {formatDateTime(sale.createdAt ?? sale.saleDate)}
+                        </p>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex flex-row-reverse items-center justify-between gap-4 sm:flex-row">
                         <div className="text-right">
                           <p className="text-2xl font-bold">
                             ₱{sale.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -383,6 +395,18 @@ export default function SalesPage() {
                   </CardContent>
                 </Card>
               ))}
+
+              <Pagination
+                page={pagination.page}
+                pageCount={pagination.pageCount}
+                start={pagination.start}
+                end={pagination.end}
+                total={pagination.total}
+                onPageChange={(p) => {
+                  pagination.setPage(p);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+              />
             </div>
           )}
         </main>
